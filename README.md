@@ -1,14 +1,132 @@
-# Molmo2 Hack: traffic video -> safe summary (frame-based)
+技術概要（Technical Overview）
 
-## 0) Setup
-Python 3.10+ recommended.
+本プロジェクトは、最新の動画理解研究モデルを実際に動作させ、交通事故映像を安全に要約する実装デモである。
+単なる UI デモではなく、研究論文レベルの Video-Language Model（VLM）をローカル実行し、実運用上の制約（安全・再現性・OS 依存）を考慮した構成を採用している。
 
-```bash
-cd molmo2_hack
-python -m venv .venv
-# Windows:
-.venv\Scripts\activate
-# mac/Linux:
-# source .venv/bin/activate
+採用モデル：Molmo2-8B
 
-pip install -r requirements.txt
+モデル名：Molmo2-8B
+
+公開元：Allen Institute for AI (AI2)
+
+種別：Open-weight Vision-Language Model（動画理解対応）
+
+公開形式：Hugging Face Models
+
+公式 Playground：AllenAI Playground（Web デモあり）
+
+位置づけ
+
+Molmo2 は、画像・動画を入力として
+時系列的理解・視覚的グラウンディング・指示追従生成を行う、
+**研究用途を前提とした最新世代の Video-LMM（Video Large Multimodal Model）**である。
+
+本プロジェクトでは、この Molmo2-8B を改変せず、そのまま推論用途で使用している。
+
+実装方針：動画を「フレーム列」として扱う理由
+
+Molmo2 は動画入力をサポートしているが、本実装では以下の理由から
+動画 → フレーム列 → モデル入力 という構成を採用している。
+
+技術的理由
+
+Windows 環境における decord / gdk-pixbuf 系依存の不安定性を回避
+
+OS・GPU 構成に依存しない再現性の確保
+
+フレーム単位での 匿名化・マスク処理を容易にするため
+
+モデル整合性
+
+多くの Video-LMM は内部的にフレームサンプリングを行う
+
+Molmo2 も 複数画像を時系列として入力する設計を持つ
+
+そのため、フレーム列入力でも 動画理解性能は実用上十分
+
+パイプライン構成
+入力動画 (mp4)
+   ↓
+フレーム抽出（ffmpeg, 低FPS）
+   ↓
+フレーム列（最大12枚）
+   ↓
+Molmo2-8B 推論
+   ↓
+安全制約付きプロンプト
+   ↓
+後処理（簡易リダクション）
+   ↓
+抽象化された事故要約テキスト
+
+安全制約付きプロンプト設計（重要）
+
+本プロジェクトの特徴は、**動画理解そのものではなく「どう出力させるか」**にある。
+
+明示的に禁止している出力
+
+人物の属性（年齢・性別・外見・服装）
+
+ナンバープレートや数値情報
+
+地名・施設名・看板・固有名詞
+
+正確な時刻・速度・位置情報
+
+当事者を特定可能な記述
+
+許可している抽象情報
+
+事故の発生有無
+
+関与主体のカテゴリ（車両・歩行者 等）
+
+道路構造（交差点・直線などの抽象表現）
+
+時系列イベント（接近 → 衝突 → 停止）
+
+不確実性の明示（「不明」「判断できない」）
+
+この制約により、
+モデルの“幻覚”や過剰具体化を抑えた、安全な動画理解結果を得る。
+
+ローカル実行・再現性
+
+クラウド推論なし
+
+外部API依存なし
+
+Open-weight モデルのみ使用
+
+GPU を搭載した一般的な PC で実行可能
+
+研究デモでありがちな「環境が違って動かない」問題を避け、
+審査環境でも再現可能な構成を優先している。
+
+フロントエンドとの統合
+
+Next.js（App Router, TypeScript）を用いた簡易 UI を実装し、
+
+動画アップロード
+
+サーバ側でのフレーム抽出
+
+Python プロセスによる Molmo2 推論
+
+結果の即時表示
+
+までを 一気通貫でデモ可能としている。
+
+UI は最小限だが、
+「研究モデルを実際に使っている」ことを審査員が即確認できる構成になっている。
+
+参考・引用
+
+Molmo2-8B (Hugging Face Models)
+https://huggingface.co/allenai/Molmo2-8B
+
+AllenAI Molmo2 Playground（公式 Web デモ）
+https://playground.allenai.org/?model=molmo2-8b
+
+Hugging Face Papers（Molmo2 関連論文・動向）
+https://huggingface.co/papers
